@@ -17,6 +17,9 @@ from config import (
     WHISPER_DEVICE,
     WHISPER_COMPUTE,
     WHISPER_LANGUAGE,
+    REC_SAMPLE_RATE,
+    DASHSCOPE_API_KEY,
+    PARAFORMER_MODEL,
 )
 
 
@@ -56,31 +59,63 @@ class LocalWhisperBackend(STTBackend):
         return "".join(seg.text for seg in segments).strip()
 
 
-class _CloudBackendTemplate(STTBackend):
-    """云 ASR 后端模板（占位，未实现）。MiniMax 平台暂无 ASR，故云端需自接他家。
+class AliyunParaformerBackend(STTBackend):
+    """阿里云百炼 Paraformer 实时 ASR：中文、低延迟、国内直连，需 DASHSCOPE_API_KEY。
 
-    接入步骤：
-      1. 复制本类并改名，如 AliyunParaformerBackend / IFlytekBackend。
-      2. 在 transcribe() 里把 16kHz 单声道 int16 ndarray 发给云 ASR、返回识别文本：
-         - 取原始 PCM 字节：audio_int16.tobytes()（已是 16-bit 小端）；
-         - 需要 WAV 容器时用标准库 wave 包一层（16000Hz / 1ch / 2bytes）；
-         - 鉴权与 endpoint 从 config 读（在 config.py 新增对应 env 变量）。
-      3. 在下方 _BACKENDS 注册：{"aliyun": AliyunParaformerBackend}。
-      4. .env 设 STT_BACKEND=aliyun 即可启用。
-    管线其余部分（录音、pipeline、TTS、播放）无需任何改动。
+    交互模式不变（整段录完再转写）：把整段 16kHz int16 PCM 按 100ms 分帧喂进流式
+    Recognition，仅在句子终态时累积文本。后续 PWA 阶段可把它升级为真·边说边转。
+
+    其它云 ASR（火山引擎 seed-asr / 讯飞 RTASR / 腾讯云）照此类再写一个并在 _BACKENDS
+    登记即可，管线其余部分（录音、pipeline、TTS、播放）无需任何改动。
     """
 
+    _CHUNK = REC_SAMPLE_RATE * 2 // 10  # 100ms @ 16kHz mono int16 = 3200 字节
+
+    def load(self):
+        if not DASHSCOPE_API_KEY:
+            raise RuntimeError(
+                "缺少 DASHSCOPE_API_KEY，请在 voice_assistant/.env 填写，"
+                "或把 STT_BACKEND 设回 local 使用本地 Whisper。"
+            )
+        import dashscope  # 延迟导入，加快无云 STT 场景启动
+        dashscope.api_key = DASHSCOPE_API_KEY
+
     def transcribe(self, audio_int16):
-        raise NotImplementedError(
-            "当前 STT 后端为占位模板，尚未实现。请参考 stt.py 中 _CloudBackendTemplate "
-            "的说明接入具体云 ASR，或把 .env 的 STT_BACKEND 设回 local 使用本地 Whisper。"
+        if audio_int16 is None or len(audio_int16) == 0:
+            return ""
+        self.load()
+        from dashscope.audio.asr import Recognition, RecognitionCallback, RecognitionResult
+
+        parts = []
+
+        class _CB(RecognitionCallback):
+            def on_event(self, result):
+                s = result.get_sentence()
+                # 一句话期间 on_event 会多次回调、text 逐渐增长，只在终态取，避免重复累加
+                if isinstance(s, dict) and s.get("text") and RecognitionResult.is_sentence_end(s):
+                    parts.append(s["text"])
+
+        rec = Recognition(
+            model=PARAFORMER_MODEL,
+            format="pcm",
+            sample_rate=REC_SAMPLE_RATE,
+            language_hints=["zh"],
+            callback=_CB(),
         )
+        pcm = audio_int16.tobytes()  # 已是 16-bit 小端
+        rec.start()
+        try:
+            for i in range(0, len(pcm), self._CHUNK):
+                rec.send_audio_frame(pcm[i:i + self._CHUNK])
+        finally:
+            rec.stop()  # 阻塞直到终态回调完成
+        return "".join(parts).strip()
 
 
 # 后端注册表：名字 -> 工厂。新增云后端在此登记。
 _BACKENDS = {
     "local": LocalWhisperBackend,
-    # "aliyun": AliyunParaformerBackend,   # 示例：实现后取消注释并登记
+    "aliyun": AliyunParaformerBackend,
 }
 
 _backend = None

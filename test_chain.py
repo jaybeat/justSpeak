@@ -16,7 +16,7 @@ except Exception:
 
 import numpy as np
 
-from config import make_minimax_client, TTS_SAMPLE_RATE, REC_SAMPLE_RATE
+from config import make_minimax_client, TTS_SAMPLE_RATE, REC_SAMPLE_RATE, STT_BACKEND
 from pipeline import stream_reply
 from tts import tts_stream
 import stt
@@ -72,7 +72,7 @@ def test_tts() -> np.ndarray:
 
 
 def test_stt(tts_audio_24k: np.ndarray):
-    print("=== 3. 本地 Whisper STT（回环识别合成音频） ===")
+    print(f"=== 3. STT（后端={STT_BACKEND}，回环识别合成音频） ===")
     audio_16k = _resample_to_int16(tts_audio_24k, TTS_SAMPLE_RATE, REC_SAMPLE_RATE)
     t0 = time.time()
     text_back = stt.transcribe(audio_16k)

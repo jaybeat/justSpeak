@@ -16,6 +16,8 @@ load_dotenv()
 # ---- MiniMax LLM ----
 MINIMAX_BASE_URL = os.getenv("MINIMAX_BASE_URL", "https://api.minimaxi.com/v1")
 MINIMAX_API_KEY = os.getenv("MINIMAX_API_KEY", "")
+# Text-01 是唯一的非推理模型，首字延迟最低（实测 ~2s，对话最跟手）。
+# M2.x/M3 等推理模型在 OpenAI 兼容端点上无法真正关闭思考，首字要等 6~10s，不适合实时语音。
 MINIMAX_MODEL = os.getenv("MINIMAX_MODEL", "MiniMax-Text-01")
 
 # ---- MiniMax TTS（T2A v2）----
@@ -31,7 +33,11 @@ MINIMAX_VOICE_ID_JA = os.getenv("MINIMAX_VOICE_ID_JA", "Japanese_KindLady")
 TARGET_LANG = os.getenv("TARGET_LANG", "en")  # 默认目标语言：en（中译英）/ ja（中译日），运行时可切换
 
 # ---- STT 后端选择 ----
-STT_BACKEND = os.getenv("STT_BACKEND", "local")  # local=本地 faster-whisper（默认）；云后端见 stt.py
+STT_BACKEND = os.getenv("STT_BACKEND", "local")  # local=本地 faster-whisper（默认）；aliyun=阿里云 Paraformer，见 stt.py
+
+# ---- 云 STT（阿里云百炼 Paraformer 实时 ASR）----
+DASHSCOPE_API_KEY = os.getenv("DASHSCOPE_API_KEY", "")
+PARAFORMER_MODEL = os.getenv("PARAFORMER_MODEL", "paraformer-realtime-v2")
 
 # ---- 本地 STT（faster-whisper）----
 WHISPER_MODEL = os.getenv("WHISPER_MODEL", "small")

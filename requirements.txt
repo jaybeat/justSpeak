@@ -1,0 +1,6 @@
+openai
+faster-whisper
+sounddevice
+numpy
+python-dotenv
+httpx

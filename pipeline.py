@@ -25,21 +25,64 @@ def transcribe(audio_int16) -> str:
     return _stt.transcribe(audio_int16)
 
 
+def _strip_think(chunks):
+    """流式剥离 `<think>...</think>` 思维链，逐段 yield 纯净文本。
+
+    防御性兜底：推理模型（如 MiniMax-M3）在 OpenAI 兼容端点上可能把思考内联进
+    content。标签可能被切在两个增量块之间，故用缓冲+状态机跨 chunk 处理，
+    并保留可能构成标签前缀的尾部字符，避免把半个标签当正文吐出。
+    """
+    OPEN, CLOSE = "<think>", "</think>"
+    buf, inside = "", False
+    for c in chunks:
+        buf += c
+        while True:
+            if not inside:
+                i = buf.find(OPEN)
+                if i == -1:
+                    keep = len(OPEN) - 1  # 末尾可能是 "<think" 之类的前缀，先留着
+                    if len(buf) > keep:
+                        yield buf[:-keep]
+                        buf = buf[-keep:]
+                    break
+                if i > 0:
+                    yield buf[:i]
+                buf, inside = buf[i + len(OPEN):], True
+            else:
+                j = buf.find(CLOSE)
+                if j == -1:
+                    keep = len(CLOSE) - 1
+                    buf = buf[-keep:] if len(buf) > keep else buf
+                    break
+                buf, inside = buf[j + len(CLOSE):], False
+    if buf and not inside:
+        yield buf
+
+
 def stream_reply(minimax, messages):
-    """调用 MiniMax（OpenAI 兼容）流式接口，逐段 yield 文本增量。"""
+    """调用 MiniMax（OpenAI 兼容）流式接口，逐段 yield 纯净文本增量。
+
+    extra_body 关闭 M3 思考（默认 adaptive）：翻译/口语对话无需深推理，关掉可消除
+    `<think>` 泄漏、降低首字延迟与成本。再经 _strip_think 兜底，确保万一泄漏也不外泄。
+    """
     stream = minimax.chat.completions.create(
         model=MINIMAX_MODEL,
         messages=messages,
         stream=True,
         temperature=0.7,
         max_tokens=1024,
+        extra_body={"thinking": {"type": "disabled"}},
     )
-    for chunk in stream:
-        if not chunk.choices:
-            continue
-        text = getattr(chunk.choices[0].delta, "content", None)
-        if text:
-            yield text
+
+    def _content_deltas():
+        for chunk in stream:
+            if not chunk.choices:
+                continue
+            text = getattr(chunk.choices[0].delta, "content", None)
+            if text:
+                yield text
+
+    yield from _strip_think(_content_deltas())
 
 
 def _flush_sentences(buffer: str, sentence_queue: "queue.Queue") -> str:

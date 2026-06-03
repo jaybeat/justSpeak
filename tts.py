@@ -24,6 +24,8 @@ def tts_stream(text: str):
         "model": MINIMAX_TTS_MODEL,
         "text": text,
         "stream": True,
+        # 让服务端不要在最后再下发一次「整段聚合音频」，从源头避免重复
+        "stream_options": {"exclude_aggregated_audio": True},
         "voice_setting": {"voice_id": MINIMAX_VOICE_ID, "speed": 1, "vol": 1, "pitch": 0},
         "audio_setting": {"sample_rate": TTS_SAMPLE_RATE, "format": "pcm", "channel": 1},
     }
@@ -40,6 +42,10 @@ def tts_stream(text: str):
                     continue
                 payload = json.loads(line[5:].strip())
                 data = payload.get("data") or {}
+                # status==1 是增量块；status==2 是末尾的整段聚合块，会把整句音频
+                # 再返回一次，必须丢弃，否则部分句子会被播放两遍。
+                if data.get("status") != 1:
+                    continue
                 audio_hex = data.get("audio")
                 if audio_hex:
                     yield bytes.fromhex(audio_hex)

@@ -34,6 +34,23 @@ This machine's Anaconda (`D:\anaconda3`) has broken native ML DLLs: `ctranslate2
 ./.venv/Scripts/python.exe translate.py
 ```
 
+### Web / PWA（按住说话的语音翻译，浏览器/手机）
+
+```bash
+# 1) 后端：FastAPI + WebSocket，复用桌面管线（在 voice_assistant/ 目录跑）
+./.venv/Scripts/python.exe -m uvicorn server.app:app --host 0.0.0.0 --port 8000
+
+# 2) 前端：React + Vite（dev 服务器把 /ws、/healthz 代理到后端 :8000）
+cd web && npm install && npm run dev      # 桌面 http://localhost:5173
+cd web && npm run build && npm run preview # 跑生产构建（Service Worker 仅在此生效）
+
+# 后端无浏览器自测（仿 test_chain）：合成中文 -> WS -> 断言识别+译文+回流 PCM
+./.venv/Scripts/python.exe test_ws.py
+```
+
+> 手机实测：浏览器麦克风（`getUserMedia`）只在 **HTTPS 或 localhost** 下可用。手机连电脑要走
+> `https://局域网IP` 自签证书或临时隧道（cloudflared/ngrok）。iOS 安装态需在「按住」手势内解锁 AudioContext。
+
 There is no build/lint step and no test framework — `test_chain.py` is how you confirm the
 pipeline works without a microphone. The only path it does **not** cover is live mic capture
 (`record_until_enter`), which needs an interactive human + mic.
@@ -100,6 +117,24 @@ no longer the bottleneck.
 - `pipeline.py` — glue: `transcribe`, `stream_reply`, `speak_streaming`.
 - `main.py` — multi-turn loop holding `messages` history; forces UTF-8 stdout (Windows console is
   GBK and will otherwise garble Chinese); preloads the active STT backend at startup.
+- `translate_core.py` — `LANGS` + `build_messages()`（翻译系统提示/few-shot/音色），由 CLI
+  `translate.py` 与 Web 后端共享，避免复制提示词。
+
+### Web/PWA 分层（`server/` + `web/`）
+
+第一阶段「按住说话」的语音翻译 PWA。**复用桌面管线，不重写业务逻辑**：
+
+- `server/app.py` — FastAPI + WebSocket `/ws/translate`。协议：客户端发 `{"type":"start","lang"}`
+  → 二进制 PCM16/16k 帧 → `{"type":"end"}`；后端转写→翻译→句级 TTS，把 PCM(24k) 二进制与
+  识别/译文文本(JSON) 回推。关键桥接 `WebSocketSink`（`feed`/`finish` 鸭子类型）直接喂给
+  `pipeline.speak_streaming`，连句级 TTS 重叠的低延迟一起复用，**未改 pipeline.py**。
+- `web/` — React + Vite PWA。`src/audio.js`=采集(16k)/播放(24k) 两个 AudioWorklet（播放即
+  `GaplessPlayer` 的浏览器版）；`src/session.js`=WS + 一个 turn 的起止，**`start()/end()` 是 VAD 接缝**
+  （现由「按住」按钮调用，将来免提模式由 Silero VAD 的 `onSpeechStart/onSpeechEnd` 调同样两个方法）；
+  `public/*-worklet.js`=两个 worklet 处理器；`public/sw.js`+`manifest.webmanifest`=可安装 PWA。
+- `test_ws.py` — Web 后端的无浏览器自测（对应 CLI 的 `test_chain.py`）。
+
+> 未做（已留接缝）：真·边说边转（后端把帧实时转发 Paraformer）、免提 VAD、WebRTC 传输。
 
 ## Configuration
 

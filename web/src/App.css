@@ -1,0 +1,101 @@
+.app {
+  max-width: 520px;
+  margin: 0 auto;
+  min-height: 100svh;
+  padding: 24px 20px 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+h1 {
+  font-size: 22px;
+  font-weight: 600;
+  margin: 8px 0 24px;
+}
+
+.lang-toggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 32px;
+}
+
+.lang-toggle button {
+  padding: 8px 18px;
+  border-radius: 999px;
+  border: 1px solid #34363f;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.lang-toggle button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.lang-toggle button:disabled { opacity: 0.5; cursor: default; }
+
+.talk {
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  border: none;
+  background: linear-gradient(160deg, var(--accent), var(--accent-2));
+  color: #fff;
+  font-size: 22px;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: none; /* 关键：禁止触摸滚动/缩放干扰按住 */
+  box-shadow: 0 12px 30px rgba(47, 107, 255, 0.35);
+  transition: transform 0.08s ease, box-shadow 0.2s ease;
+}
+
+.talk:active,
+.talk.listening {
+  transform: scale(0.96);
+  box-shadow: 0 0 0 10px rgba(79, 140, 255, 0.18), 0 12px 30px rgba(47, 107, 255, 0.35);
+}
+
+.talk.processing { opacity: 0.7; }
+
+.status {
+  margin: 20px 0 4px;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.error { color: #ff7b7b; font-size: 14px; margin: 8px 0; }
+
+.result {
+  margin-top: 28px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.line {
+  background: var(--panel);
+  border-radius: 12px;
+  padding: 14px 16px;
+  text-align: left;
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.tag {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: var(--muted);
+  background: #2c2e37;
+  border-radius: 6px;
+  padding: 2px 8px;
+}
+
+.text { color: var(--text); user-select: text; }
+.text.big { font-size: 20px; font-weight: 600; }

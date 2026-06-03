@@ -1,0 +1,27 @@
+:root {
+  --bg: #16171d;
+  --panel: #1f2028;
+  --text: #e7e7ea;
+  --muted: #9ca3af;
+  --accent: #4f8cff;
+  --accent-2: #2f6bff;
+  font: 17px/1.5 system-ui, 'Segoe UI', Roboto, sans-serif;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  /* 防止按住说话时触发文本选择 / 页面滚动 */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  overscroll-behavior: none;
+}

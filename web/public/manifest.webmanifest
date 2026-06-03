@@ -1,0 +1,20 @@
+{
+  "name": "justSpeak 语音翻译",
+  "short_name": "justSpeak",
+  "description": "按住说话，中译英 / 中译日，实时语音翻译",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#16171d",
+  "theme_color": "#16171d",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

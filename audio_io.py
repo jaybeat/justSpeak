@@ -15,17 +15,25 @@ import sounddevice as sd
 from config import REC_SAMPLE_RATE, TTS_SAMPLE_RATE
 
 
-def record_until_enter():
+def record_until_enter(prompt=None, commands=()):
     """回车开始录音，再按回车结束。
+
+    参数:
+        prompt   -> 自定义开始提示文案（默认沿用原提示）
+        commands -> 一组可识别的命令字符串（小写）；用户输入其一时不录音，直接把该命令冒泡返回
 
     返回:
         None        -> 用户在开始提示处输入 q，表示退出
+        str         -> 用户输入了 commands 中的某个命令（如语言切换 "en"/"ja"），原样返回
         空 ndarray  -> 没有录到任何音频
         ndarray     -> 16kHz 单声道 int16 的一维数组
     """
-    cmd = input("\n▶ 回车开始录音（输入 q 退出）：")
-    if cmd.strip().lower() == "q":
+    cmd = input(prompt or "\n▶ 回车开始录音（输入 q 退出）：")
+    s = cmd.strip().lower()
+    if s == "q":
         return None
+    if s in commands:
+        return s
 
     frames = []
 

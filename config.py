@@ -24,6 +24,11 @@ MINIMAX_TTS_MODEL = os.getenv("MINIMAX_TTS_MODEL", "speech-02-turbo")
 MINIMAX_VOICE_ID = os.getenv("MINIMAX_VOICE_ID", "female-shaonv")
 # 翻译模式朗读英文用的音色；留空则回退到 MINIMAX_VOICE_ID（多语种模型也能读英文）
 MINIMAX_VOICE_ID_EN = os.getenv("MINIMAX_VOICE_ID_EN", "")
+# 翻译模式朗读日文用的音色；留空则回退默认音色
+MINIMAX_VOICE_ID_JA = os.getenv("MINIMAX_VOICE_ID_JA", "Japanese_KindLady")
+
+# ---- 翻译模式 ----
+TARGET_LANG = os.getenv("TARGET_LANG", "en")  # 默认目标语言：en（中译英）/ ja（中译日），运行时可切换
 
 # ---- STT 后端选择 ----
 STT_BACKEND = os.getenv("STT_BACKEND", "local")  # local=本地 faster-whisper（默认）；云后端见 stt.py

@@ -74,7 +74,10 @@ When editing latency behavior, the knobs are: the sentence-boundary regex / `_MA
 - `config.py` — loads `.env`, exposes `make_minimax_client()` (an `openai.OpenAI` pointed at the
   MiniMax OpenAI-compatible endpoint), and all model/voice/sample-rate constants. `REC_SAMPLE_RATE=16000`
   (Whisper input), `TTS_SAMPLE_RATE=24000` (MiniMax PCM output / playback).
-- `stt.py` — lazily loads and caches a `faster_whisper.WhisperModel`; `transcribe(int16 ndarray)`.
+- `stt.py` — pluggable STT backends selected by `STT_BACKEND` (default `local`). `LocalWhisperBackend`
+  lazily loads/caches a `faster_whisper.WhisperModel`. Public facade `load_model()` / `transcribe(int16 ndarray)`
+  unchanged. To add a cloud ASR (MiniMax has no ASR API): subclass `STTBackend`, register in `_BACKENDS`
+  (see `_CloudBackendTemplate`); nothing else in the pipeline changes.
 - `tts.py` — `tts_stream(text)` POSTs to MiniMax `t2a_v2` with `stream:true`, parses `data:` SSE
   lines, and yields `bytes.fromhex(data.audio)`. Uses `httpx.Client(trust_env=False)` so it can
   never accidentally route through a system proxy.

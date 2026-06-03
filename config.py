@@ -25,6 +25,9 @@ MINIMAX_VOICE_ID = os.getenv("MINIMAX_VOICE_ID", "female-shaonv")
 # 翻译模式朗读英文用的音色；留空则回退到 MINIMAX_VOICE_ID（多语种模型也能读英文）
 MINIMAX_VOICE_ID_EN = os.getenv("MINIMAX_VOICE_ID_EN", "")
 
+# ---- STT 后端选择 ----
+STT_BACKEND = os.getenv("STT_BACKEND", "local")  # local=本地 faster-whisper（默认）；云后端见 stt.py
+
 # ---- 本地 STT（faster-whisper）----
 WHISPER_MODEL = os.getenv("WHISPER_MODEL", "small")
 WHISPER_DEVICE = os.getenv("WHISPER_DEVICE", "cpu")      # cpu / cuda / auto（auto 需 CUDA 运行库）

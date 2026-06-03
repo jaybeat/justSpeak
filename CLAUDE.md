@@ -25,6 +25,9 @@ This machine's Anaconda (`D:\anaconda3`) has broken native ML DLLs: `ctranslate2
 
 # Run the interactive assistant (multi-turn; Enter to start/stop recording, q to quit)
 ./.venv/Scripts/python.exe main.py
+
+# Run the Chinese->English speech translation mode (speak Chinese, get idiomatic English spoken + shown)
+./.venv/Scripts/python.exe translate.py
 ```
 
 There is no build/lint step and no test framework — `test_chain.py` is how you confirm the

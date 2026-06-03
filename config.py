@@ -22,6 +22,8 @@ MINIMAX_MODEL = os.getenv("MINIMAX_MODEL", "MiniMax-Text-01")
 MINIMAX_TTS_URL = os.getenv("MINIMAX_TTS_URL", "https://api.minimaxi.com/v1/t2a_v2")
 MINIMAX_TTS_MODEL = os.getenv("MINIMAX_TTS_MODEL", "speech-02-turbo")
 MINIMAX_VOICE_ID = os.getenv("MINIMAX_VOICE_ID", "female-shaonv")
+# 翻译模式朗读英文用的音色；留空则回退到 MINIMAX_VOICE_ID（多语种模型也能读英文）
+MINIMAX_VOICE_ID_EN = os.getenv("MINIMAX_VOICE_ID_EN", "")
 
 # ---- 本地 STT（faster-whisper）----
 WHISPER_MODEL = os.getenv("WHISPER_MODEL", "small")

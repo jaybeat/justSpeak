@@ -18,15 +18,20 @@ from config import (
 )
 
 
-def tts_stream(text: str):
-    """流式合成，逐块 yield PCM bytes（24kHz, mono, int16）。"""
+def tts_stream(text: str, voice_id: str | None = None):
+    """流式合成，逐块 yield PCM bytes（24kHz, mono, int16）。
+
+    voice_id 留空时回退到 config 默认音色（保持现有 main.py 行为不变）；
+    翻译模式可传入英文音色 ID 来朗读英文。
+    """
+    voice = voice_id or MINIMAX_VOICE_ID
     body = {
         "model": MINIMAX_TTS_MODEL,
         "text": text,
         "stream": True,
         # 让服务端不要在最后再下发一次「整段聚合音频」，从源头避免重复
         "stream_options": {"exclude_aggregated_audio": True},
-        "voice_setting": {"voice_id": MINIMAX_VOICE_ID, "speed": 1, "vol": 1, "pitch": 0},
+        "voice_setting": {"voice_id": voice, "speed": 1, "vol": 1, "pitch": 0},
         "audio_setting": {"sample_rate": TTS_SAMPLE_RATE, "format": "pcm", "channel": 1},
     }
     headers = {

@@ -60,8 +60,11 @@ def _flush_sentences(buffer: str, sentence_queue: "queue.Queue") -> str:
     return remainder
 
 
-def speak_streaming(player, text_stream) -> str:
-    """消费 LLM 文本流，按句送 MiniMax TTS，边播边收集完整回复并返回。"""
+def speak_streaming(player, text_stream, voice_id=None) -> str:
+    """消费 LLM 文本流，按句送 MiniMax TTS，边播边收集完整回复并返回。
+
+    voice_id 透传给 tts_stream；留空时用 config 默认音色（main.py 调用不变）。
+    """
     sentence_queue: "queue.Queue" = queue.Queue()
     reply_parts = []
 
@@ -70,7 +73,7 @@ def speak_streaming(player, text_stream) -> str:
             sentence = sentence_queue.get()
             if sentence is None:
                 return
-            for pcm in tts_stream(sentence):
+            for pcm in tts_stream(sentence, voice_id):
                 player.feed(pcm)
 
     worker = threading.Thread(target=tts_worker, daemon=True)

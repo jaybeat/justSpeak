@@ -71,6 +71,16 @@ $PY = "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe"
 - 终端打印识别文本和 MiniMax 流式回复，扬声器在 LLM 没说完时就开始播放。
 - 在「回车开始录音」提示处输入 **q** 退出。
 
+### 中译英语音翻译模式
+
+```powershell
+.\.venv\Scripts\python.exe translate.py
+```
+
+- 说**中文**，系统翻译成**地道口语英文**并朗读，同时在终端显示英文译文。
+- 每句独立翻译；交互方式（回车录音、q 退出）与对话模式相同。
+- 想要更地道的英音/美音，在 `.env` 设 `MINIMAX_VOICE_ID_EN` 为某个 MiniMax 英文音色 ID（留空则用默认音色）。
+
 ## 5. 常见问题
 
 - **第一轮慢**：首次加载/下载 Whisper 模型；`main.py` 已在启动时预加载。想更快可把 `WHISPER_MODEL` 调小（如 `base`）。

@@ -1,31 +1,64 @@
-# 本地低延迟语音助手（MiniMax + 本地 Whisper）
+# justSpeak · 按住说话的语音翻译
 
-参考 [ElevenLabs + Claude cookbook](https://platform.claude.com/cookbook/third-party-elevenlabs-low-latency-stt-claude-tts) 的**全程流式 + 管线重叠**低延迟思路，把整套栈落到 **MiniMax + 本地 Whisper**：
+说**中文**，实时**朗读 + 显示**地道口语**英文 / 日文**。手机可装成 **PWA**「按住说话」，也有桌面命令行版。底层是一套**全程流式 + 管线重叠**的低延迟语音管线，两端复用。
 
 ```
-回车录音 → 本地 Whisper(STT) → MiniMax 流式(LLM) → 句级流式 MiniMax(TTS) → 无缝播放
+按住说话(浏览器/麦克风) → STT 转写 → MiniMax 流式翻译(LLM) → 句级流式 TTS → 无缝播放 + 显示译文
 ```
 
-- **LLM**：MiniMax（OpenAI 兼容接口，用 `openai` SDK，国内直连）
-- **TTS**：MiniMax T2A v2（HTTP 流式，返回 hex 编码 PCM，国内直连）
-- **STT**：本地 `faster-whisper`（离线、无需任何 key、支持中文）
-- **不需要代理**：全部国内直连或本地。
+## 技术栈
 
-> 为什么 STT 用本地 Whisper：MiniMax **没有**语音识别（ASR）API，只有合成/克隆。
-> ElevenLabs 又因 key 权限不可用，所以 STT 用本地 Whisper，既离线又免 key。
+- **LLM**：MiniMax（`MiniMax-Text-01`，OpenAI 兼容接口，国内直连）——非推理模型，首字延迟低，适合实时语音。
+- **TTS**：MiniMax T2A v2（`speech-2.8-turbo`，HTTP 流式、低延迟）。
+- **STT（可插拔）**：默认 **阿里云百炼 Paraformer 实时 ASR**（云端、中文低延迟，需 `DASHSCOPE_API_KEY`）；
+  可切换 **本地 `faster-whisper`**（离线、免 key）。见 `stt.py` 的 `STT_BACKEND`。
+- **全程国内直连，不走代理。**
+
+> 为什么 STT 用第三方：MiniMax **没有**语音识别(ASR)API，只有合成/克隆。所以 STT 用阿里云 Paraformer(云端)或本地 Whisper(离线)。
 
 ## 低延迟原理
 
-MiniMax LLM 流式吐字 → 正则按中英文句子边界切分 → 每凑齐一句立刻送 MiniMax TTS
-流式合成 → PCM 块进 `GaplessPlayer` 播放队列被单条 `OutputStream` 连续播放。
-**LLM 生成 / TTS 合成 / 音频播放三者重叠**，而非串行相加。
+MiniMax LLM 流式吐字 → 按中英文句子边界切分 → 每凑齐一句**立刻**送 TTS 流式合成 → PCM 块进播放队列连续播放。
+**LLM 生成 / TTS 合成 / 音频播放三者重叠**，而非串行相加。桌面端是 `GaplessPlayer`，浏览器端是等价的 AudioWorklet 播放队列。
 
-## 1. 安装（必须用「非 anaconda」的干净 Python 建 venv）
+---
 
-> ⚠️ 重要：本机 anaconda 的 Intel DLL 会让 `ctranslate2`（Whisper 后端）**加载即闪退**
-> （access violation）。所以 venv 必须用 python.org 的干净 Python 来建，**不能**用 anaconda 的。
-> 本项目已用 winget 安装了 `Python 3.12.10` 到
-> `C:\Users\Administrator\AppData\Local\Programs\Python\Python312\`。
+## 用法 A：PWA（手机 / 浏览器，按住说话）
+
+`server/`（FastAPI + WebSocket）复用桌面管线，`web/`（React + Vite）是按住说话的 PWA 前端。
+
+```bash
+# 1) 后端(在 voice_assistant/ 目录)
+./.venv/Scripts/python.exe -m uvicorn server.app:app --host 0.0.0.0 --port 8000
+
+# 2) 前端(dev 服务器把 /ws、/healthz 代理到后端 :8000)
+cd web && npm install && npm run dev        # 桌面 http://localhost:5173
+# 跑生产构建(Service Worker / 可安装 PWA 仅在此生效)：
+cd web && npm run build && npm run preview
+```
+
+- **按住**圆钮说中文、**松手**出翻译并朗读；可切「中→英 / 中→日」。首次按下时浏览器会请求麦克风权限。
+- 后端无浏览器自测：`./.venv/Scripts/python.exe test_ws.py`。
+
+> 📱 手机实测：浏览器麦克风(`getUserMedia`)只在 **HTTPS 或 localhost** 下可用。手机连电脑要走
+> `https://局域网IP`(自签证书)或临时隧道(cloudflared / ngrok)。
+
+## 用法 B：桌面命令行
+
+```powershell
+# 多轮语音对话助手：回车开始/结束录音，q 退出
+.\.venv\Scripts\python.exe main.py
+
+# 中译英 / 中译日 语音翻译：说中文，朗读+显示译文；录音提示处输入 en/ja 随时切换
+.\.venv\Scripts\python.exe translate.py
+
+# 无麦克风链路自测：MiniMax LLM → TTS → STT 回环
+.\.venv\Scripts\python.exe test_chain.py
+```
+
+---
+
+## 安装
 
 ```powershell
 cd voice_assistant
@@ -34,57 +67,38 @@ $PY = "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe"
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-之后所有命令都用 `.\.venv\Scripts\python.exe` 运行（不要用 `python`，那是 anaconda 的）。
+之后命令都用 `.\.venv\Scripts\python.exe`。前端另需 Node.js（`web/` 里 `npm install`）。
 
-> STT 默认跑 **CPU**（`WHISPER_DEVICE=cpu`）。本机没有 CUDA 运行库，设 `auto`/`cuda` 会因
-> 缺 `cublas64_12.dll` 报错。有正确 CUDA 环境时再改回 `cuda`。
+> ⚠️ 仅当使用**本地 Whisper**（`STT_BACKEND=local`）时：venv 必须用 python.org 的**干净 Python** 建，
+> 不能用 anaconda（其 Intel DLL 会让 `ctranslate2` 加载即闪退）；且需 `WHISPER_DEVICE=cpu`（本机无 CUDA）。
+> 用云端 STT（`aliyun`）则不导入 Whisper，无此约束。
 
-## 2. 配置
+## 配置（`.env`）
 
-`.env` 已就绪（MiniMax key 已填）。可按需调整：
+拷贝 `.env.example` 为 `.env`，按需填写：
 
 | 变量 | 说明 |
 | --- | --- |
-| `MINIMAX_BASE_URL` / `MINIMAX_API_KEY` / `MINIMAX_MODEL` | LLM 接口、密钥、模型名 |
-| `MINIMAX_TTS_URL` / `MINIMAX_TTS_MODEL` / `MINIMAX_VOICE_ID` | TTS 接口、模型（`speech-02-turbo`）、音色 |
-| `WHISPER_MODEL` | `tiny`/`base`/`small`/`medium`/`large-v3`，越大越准越慢（默认 `small`） |
-| `WHISPER_DEVICE` | `auto`/`cpu`/`cuda` |
-| `WHISPER_COMPUTE` | `int8`(CPU 快) / `float16`(GPU) / `default` |
-| `WHISPER_LANGUAGE` | 默认 `zh` |
+| `MINIMAX_API_KEY` | MiniMax 密钥（LLM + TTS，必填） |
+| `MINIMAX_MODEL` | LLM 模型（默认 `MiniMax-Text-01`） |
+| `MINIMAX_TTS_MODEL` / `MINIMAX_VOICE_ID` | TTS 模型（默认 `speech-2.8-turbo`）、音色 |
+| `MINIMAX_VOICE_ID_EN` / `MINIMAX_VOICE_ID_JA` | 翻译模式朗读英文 / 日文的音色 |
+| `STT_BACKEND` | `aliyun`（默认，云端 Paraformer）/ `local`（本地 Whisper） |
+| `DASHSCOPE_API_KEY` / `PARAFORMER_MODEL` | 阿里云百炼密钥、模型（`STT_BACKEND=aliyun` 时） |
+| `WHISPER_MODEL` / `WHISPER_DEVICE` / `WHISPER_LANGUAGE` | 本地 Whisper 参数（`STT_BACKEND=local` 时） |
+| `TARGET_LANG` | 翻译默认目标语言：`en` / `ja` |
 
-## 3. 链路自测（无需麦克风）
+> `.env` 已 gitignore，真实密钥不入库。
 
-```powershell
-.\.venv\Scripts\python.exe test_chain.py
-```
+## 目录
 
-依次验证：MiniMax LLM 流式 → MiniMax TTS（存为 `test_tts.wav`）→ 本地 Whisper 把合成音频转回文字。
-首次会下载 Whisper 模型（`small` 约 460MB）。
+- `server/` — FastAPI + WebSocket（`/ws/translate`），桥接现有管线给浏览器。
+- `web/` — React + Vite PWA（采集/播放两个 AudioWorklet、按住说话、可安装）。
+- `pipeline.py` / `stt.py` / `tts.py` / `config.py` / `translate_core.py` — 共享的低延迟管线与可插拔 STT。
+- `main.py` / `translate.py` — 桌面命令行入口。
 
-## 4. 运行
+## Roadmap（已留接缝，未做）
 
-```powershell
-.\.venv\Scripts\python.exe main.py
-```
-
-- **回车**开始录音 → 说话 → 再按**回车**结束。
-- 终端打印识别文本和 MiniMax 流式回复，扬声器在 LLM 没说完时就开始播放。
-- 在「回车开始录音」提示处输入 **q** 退出。
-
-### 中译英 / 中译日 语音翻译模式
-
-```powershell
-.\.venv\Scripts\python.exe translate.py
-```
-
-- 说**中文**，系统翻译成**地道口语英文 / 日文**并朗读，同时在终端显示译文。
-- **运行时切换语言**：在录音提示处输入 `en`（中译英）或 `ja`（中译日）即可随时切换；默认语言由 `.env` 的 `TARGET_LANG` 决定。
-- 每句独立翻译；交互方式（回车录音、q 退出）与对话模式相同。
-- 朗读音色可在 `.env` 配：`MINIMAX_VOICE_ID_EN`（英文）、`MINIMAX_VOICE_ID_JA`（日文，如 `Japanese_KindLady`/`Japanese_CalmLady`/`Japanese_GentleButler`）。
-
-## 5. 常见问题
-
-- **第一轮慢**：首次加载/下载 Whisper 模型；`main.py` 已在启动时预加载。想更快可把 `WHISPER_MODEL` 调小（如 `base`）。
-- **识别不准**：把 `WHISPER_MODEL` 调大（`medium`/`large-v3`），或确认录音设备正常（`python -m sounddevice`）。
-- **MiniMax 连不上**：核对 `MINIMAX_BASE_URL` / `MINIMAX_MODEL` 和 key。
-- **换音色**：改 `MINIMAX_VOICE_ID`（如 `male-qn-qingse`、`female-shaonv` 等 MiniMax 系统音色）。
+- 真·边说边转（后端把音频帧实时转发 Paraformer）；
+- 免提对话模式（浏览器端 Silero VAD 自动断句，复用同一套 turn 起止）；
+- 弱网下更稳的 WebRTC 传输。
